@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Quer ficar comigo?</title>
+    <style>
+        body {
+            background: #ffe6f2;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        h1 {
+            color: #d63384;
+            font-size: 32px;
+        }
+
+        #botoes {
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 22px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: 0.2s;
+        }
+
+        #sim {
+            background-color: #28a745;
+            color: white;
+        }
+
+        #nao {
+            background-color: #dc3545;
+            color: white;
+            position: absolute;
+        }
+
+        #mensagem {
+            margin-top: 25px;
+            font-size: 22px;
+            font-weight: bold;
+            color: #6f42c1;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Quer ficar comigo?</h1>
+
+    <div id="botoes">
+        <button id="sim">Sim</button>
+        <button id="nao">Não</button>
+    </div>
+
+    <div id="mensagem"></div>
+
+    <script>
+        const botaoNao = document.getElementById("nao");
+        const botaoSim = document.getElementById("sim");
+        const mensagem = document.getElementById("mensagem");
+
+        // Faz o botão "Não" fugir
+        botaoNao.addEventListener("mouseover", () => {
+            const largura = window.innerWidth - 100;
+            const altura = window.innerHeight - 50;
+
+            const novaPosX = Math.random() * largura;
+            const novaPosY = Math.random() * altura;
+
+            botaoNao.style.left = novaPosX + "px";
+            botaoNao.style.top = novaPosY + "px";
+        });
+
+        // Exibe mensagem ao clicar em "Sim"
+        botaoSim.addEventListener("click", () => {
+            mensagem.textContent = "Ótimo, irei te mandar o local e hora, te vejo lá!";
+        });
+    </script>
+
+</body>
+</html>
