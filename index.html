@@ -46,7 +46,7 @@
       width:100%;
       text-align:center;
       position:relative;
-      z-index:1;
+      z-index:2;
     }
 
     h1{
@@ -61,10 +61,15 @@
       font-size:14px;
     }
 
+    /* CONTROLS: agora position:relative e com área bem definida */
     .controls{
       margin-top:26px;
       position:relative;
-      height:84px; /* espaço para o botão "Não" absoluto */
+      height:110px; /* espaço para movimentos do "Não" */
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:12px;
     }
 
     button{
@@ -73,9 +78,10 @@
       border:none;
       border-radius:10px;
       cursor:pointer;
-      transition:transform .12s ease, box-shadow .12s ease;
+      transition:transform .12s ease, box-shadow .12s ease, left .12s ease, top .12s ease;
       user-select:none;
       outline: none;
+      position:relative;
     }
 
     button:active{ transform:scale(.98); }
@@ -84,19 +90,21 @@
       background:#28a745;
       color:white;
       box-shadow: 0 6px 14px rgba(40,167,69,0.18);
-      margin-right:16px;
+      z-index:3;
     }
 
-    /* botão "Não" agora position:fixed para garantir visibilidade inicial */
+    /* botão "Não" agora é absoluto dentro de .controls (não fixed) */
     #nao{
-      position:fixed;
+      position:absolute;
       background:#dc3545;
       color:white;
       border-radius:12px;
       padding:10px 16px;
       box-shadow: 0 6px 14px rgba(220,53,69,0.18);
-      z-index:10;
+      z-index:4;
       touch-action: manipulation;
+      cursor: pointer;
+      /* inicio sem left/top: será posicionado via JS relativo ao .controls */
     }
 
     /* Opções (aparece após clicar em Sim) */
@@ -107,6 +115,8 @@
       justify-content:center;
       align-items:flex-start;
       flex-wrap:wrap;
+      z-index:2;
+      position:relative;
     }
 
     .opcao{
@@ -149,6 +159,8 @@
       color:var(--accent);
       font-weight:700;
       display:none;
+      z-index:2;
+      position:relative;
     }
 
     /* overlay e foto que cresce */
@@ -170,6 +182,13 @@
       pointer-events:auto;
     }
 
+    /* animação via keyframes (mais confiável que apenas transition) */
+    @keyframes pop {
+      0%   { transform: scale(0); }
+      60%  { transform: scale(1.12); }
+      100% { transform: scale(1); }
+    }
+
     .photo-wrap{
       width:40vmin;
       height:40vmin;
@@ -184,12 +203,11 @@
       justify-content:center;
       background:linear-gradient(135deg,#fff,#f8f0ff);
       box-shadow: 0 30px 80px rgba(0,0,0,0.35);
-      transform: scale(0);
-      transition: transform .6s cubic-bezier(.16,.9,.32,1);
+      transform-origin: center center;
     }
 
     .photo-wrap.grow{
-      transform: scale(1);
+      animation: pop .72s cubic-bezier(.16,.9,.32,1) forwards;
     }
 
     .photo-wrap img{
@@ -208,6 +226,7 @@
       opacity:0;
       transform: translateY(8px);
       transition: all .32s ease;
+      z-index:51;
     }
 
     .overlay.show .overlay-message{
@@ -219,7 +238,8 @@
     @media (max-width:640px){
       .opcao{ width:140px; }
       .icone{ width:72px; height:72px; }
-      .controls{ height:110px; }
+      .controls{ height:140px; gap:8px; padding:8px; }
+      button{ padding:10px 14px; font-size:15px; }
     }
   </style>
 </head>
@@ -231,7 +251,7 @@
 
       <div class="controls" id="controls">
         <button id="sim" aria-label="Sim, quero">Sim</button>
-        <!-- "Não" será posicionado dinamicamente via JS e usa position:fixed -->
+        <!-- "Não" agora vai ser posicionado dentro do .controls -->
         <button id="nao" aria-label="Não, não quero">Não</button>
       </div>
 
@@ -295,122 +315,169 @@
     (function(){
       const botaoNao = document.getElementById('nao');
       const botaoSim = document.getElementById('sim');
+      const controls = document.getElementById('controls');
       const opcoesWrap = document.getElementById('opcoes');
       const mensagem = document.getElementById('mensagem');
       const overlay = document.getElementById('overlay');
       const photoWrap = document.getElementById('photoWrap');
       const overlayMessage = document.getElementById('overlayMessage');
 
-      // RAW image URL (já colocado no img src)
       const rawPhotoUrl = document.getElementById('playerPhoto').src;
 
-      // Função para posicionar o botão "Não" em lugar aleatório dentro da viewport visível
-      function moverNaoAleatorio(){
-        const padding = 12; // folga da borda
+      // Posiciona o botão "Não" inicialmente ao lado direito do botão "Sim"
+      function posicionarInicialNao(){
+        // obter posições relativas dentro do container
+        const simRect = botaoSim.getBoundingClientRect();
+        const controlsRect = controls.getBoundingClientRect();
+
+        // calcular coordenadas relativas ao controls (left/top)
+        // colocamos o "Não" 12px à direita do "Sim", alinhado verticalmente
+        const left = (simRect.right - controlsRect.left) + 12;
+        const top  = (simRect.top - controlsRect.top);
+
+        botaoNao.style.left = Math.max(8, left) + 'px';
+        botaoNao.style.top  = Math.max(8, top) + 'px';
+      }
+
+      // Gera uma posição aleatória DENTRO da área de controls para o "Não"
+      // garantindo que ele permaneça visível e preferencialmente longe do centro
+      function moverNaoDentroControls(){
+        const padding = 8;
+        const controlsRect = controls.getBoundingClientRect();
         const bw = botaoNao.offsetWidth;
         const bh = botaoNao.offsetHeight;
 
-        const maxX = Math.max(window.innerWidth - bw - padding, padding);
-        const maxY = Math.max(window.innerHeight - bh - padding, padding);
+        // area disponível dentro do controls (relativa ao controls)
+        const maxLeft = Math.max(controls.clientWidth - bw - padding, padding);
+        const maxTop  = Math.max(controls.clientHeight - bh - padding, padding);
 
-        // evita colocar muito perto do centro quando overlay ativo (não relevante aqui)
-        const novaX = Math.random() * maxX;
-        const novaY = Math.random() * maxY;
+        // tenta gerar uma posição que não fique muito próxima do Sim
+        const simRect = botaoSim.getBoundingClientRect();
+        const simCenter = {
+          x: (simRect.left + simRect.right)/2 - controlsRect.left,
+          y: (simRect.top + simRect.bottom)/2 - controlsRect.top
+        };
 
-        botaoNao.style.left = novaX + 'px';
-        botaoNao.style.top  = novaY + 'px';
+        let attempt = 0;
+        let novaLeft, novaTop;
+        do {
+          novaLeft = Math.floor(Math.random() * maxLeft);
+          novaTop  = Math.floor(Math.random() * maxTop);
+          attempt++;
+          // calcula distância do centro do Sim
+          const dx = (novaLeft + bw/2) - simCenter.x;
+          const dy = (novaTop + bh/2) - simCenter.y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          // preferir distâncias maiores que 80px (evita sobreposição imediata)
+          if(dist > 80 || attempt > 8) break;
+        } while(attempt < 12);
+
+        botaoNao.style.left = novaLeft + 'px';
+        botaoNao.style.top  = novaTop + 'px';
       }
 
-      // Inicial: posiciona o botão "Não" na tela (center-bottom-ish)
-      function inicializaPosicaoNao(){
-        // preferimos manualmente posicionar para não ficar fora da tela
-        const defaultX = Math.max((window.innerWidth * 0.5) + 60, 12);
-        const defaultY = Math.max(window.innerHeight * 0.22, 12);
-        botaoNao.style.left = defaultX + 'px';
-        botaoNao.style.top  = defaultY + 'px';
-      }
-
-      // Evita que o botão fique fora da tela após resize
-      function manterDentroDaTela(){
-        const rect = botaoNao.getBoundingClientRect();
-        let x = rect.left;
-        let y = rect.top;
+      // Ao redimensionar, garante que o "Não" fique dentro dos limites do controls
+      function manterNaoDentroControls(){
+        const bw = botaoNao.offsetWidth, bh = botaoNao.offsetHeight;
+        const left = parseFloat(botaoNao.style.left || 0);
+        const top = parseFloat(botaoNao.style.top || 0);
+        const maxLeft = Math.max(controls.clientWidth - bw - 8, 8);
+        const maxTop  = Math.max(controls.clientHeight - bh - 8, 8);
         let changed = false;
-        if(rect.right > window.innerWidth) { x = window.innerWidth - rect.width - 12; changed = true; }
-        if(rect.left < 0) { x = 12; changed = true; }
-        if(rect.bottom > window.innerHeight) { y = window.innerHeight - rect.height - 12; changed = true; }
-        if(rect.top < 0) { y = 12; changed = true; }
+        let newLeft = left, newTop = top;
+        if(left > maxLeft){ newLeft = maxLeft; changed = true; }
+        if(left < 8){ newLeft = 8; changed = true; }
+        if(top > maxTop){ newTop = maxTop; changed = true; }
+        if(top < 8){ newTop = 8; changed = true; }
         if(changed){
-          botaoNao.style.left = x + 'px';
-          botaoNao.style.top = y + 'px';
+          botaoNao.style.left = newLeft + 'px';
+          botaoNao.style.top  = newTop + 'px';
         }
       }
 
-      // Eventos para fazer o "Não" fugir
-      botaoNao.addEventListener('mouseenter', moverNaoAleatorio);
-      botaoNao.addEventListener('mouseover', moverNaoAleatorio);
-      botaoNao.addEventListener('click', (e)=> { e.preventDefault(); moverNaoAleatorio(); });
+      // Eventos que fazem o "Não" escapar
+      botaoNao.addEventListener('mouseenter', (e) => {
+        // pequeno delay para tornar mais divertido (evita salto instantâneo se o mouse estiver muito rápido)
+        setTimeout(moverNaoDentroControls, 80);
+      });
 
-      // mobile / touch
-      botaoNao.addEventListener('touchstart', (e)=> {
+      botaoNao.addEventListener('mouseover', (e) => {
+        // também responder ao mouseover
+        setTimeout(moverNaoDentroControls, 80);
+      });
+
+      // clique tenta, mas evita que fique clicável
+      botaoNao.addEventListener('click', (e) => {
         e.preventDefault();
-        moverNaoAleatorio();
+        moverNaoDentroControls();
+      });
+
+      // touch (mobile): quando tocar, ele foge — usamos touchstart e prevenimos click
+      botaoNao.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        moverNaoDentroControls();
       }, {passive:false});
 
-      // Mostrar opções quando clicar em Sim
+      // Mostrar opções quando clicar em Sim (mantendo o "Não" por perto)
       botaoSim.addEventListener('click', () => {
         opcoesWrap.style.display = 'flex';
         opcoesWrap.setAttribute('aria-hidden','false');
+        // opcional: esconder o Sim se preferir
         botaoSim.style.display = 'none';
-        // leve reposicionamento do Não
-        moverNaoAleatorio();
+        // reposicionar "Não" para garantir visibilidade dentro do controls
+        // (o controls pode mudar de tamanho no mobile)
+        setTimeout(() => {
+          manterNaoDentroControls();
+        }, 50);
       });
 
       // comportamento das opções: ao clicar, animar a foto crescendo e exibir mensagem
       function acaoOpcao(tipo){
-        // esconder opções e botão Não enquanto anima
+        // esconder opções (mas manter o "Não" no controls — se quiser esconder, altere aqui)
         opcoesWrap.style.display = 'none';
-        botaoNao.style.display = 'none';
+        // esconder também o "Não" durante a animação para não distrair (volta depois)
+        botaoNao.style.visibility = 'hidden';
 
         // preparar overlay
         overlay.classList.add('show');
         overlay.setAttribute('aria-hidden','false');
 
-        // garante imagem recarregada (pré-carregamento desnecessário mas garante)
+        // recarrega imagem (garante que o navegador a tenha)
         const img = document.getElementById('playerPhoto');
-        img.src = rawPhotoUrl;
+        if (img.src !== rawPhotoUrl) img.src = rawPhotoUrl;
 
         // reset estado
         photoWrap.classList.remove('grow');
         overlayMessage.style.opacity = 0;
 
-        // Força repaint para garantir animação mesmo se já estiver em grow
+        // força reflow antes de aplicar a classe (garante que a animação rode sempre)
         void photoWrap.offsetWidth;
 
-        // anima crescimento
+        // anima crescimento via keyframes
         setTimeout(()=> {
           photoWrap.classList.add('grow');
         }, 40);
 
-        // após a animação (tempo ~600ms), exibe a mensagem na tela (texto fixo conforme pedido)
+        // após a animação (aprox .72s), exibe a mensagem overlay
         setTimeout(()=> {
           overlayMessage.textContent = 'Opa, te mando local e hora, te vejo lá';
-          // deixar a mensagem visível (usa transição CSS)
           overlayMessage.style.opacity = 1;
-        }, 680);
+        }, 760);
 
         // também atualiza o #mensagem dentro do card (opcional)
         setTimeout(()=> {
           mensagem.textContent = 'Opa, te mando local e hora, te vejo lá';
           mensagem.style.display = 'block';
-        }, 900);
+        }, 1000);
 
-        // fecha overlay automaticamente após uns segundos (opcional) — aqui mantemos por 3.2s e remove
+        // fecha overlay automaticamente após 3.2s e traz o "Não" de volta
         setTimeout(()=> {
           overlay.classList.remove('show');
           overlay.setAttribute('aria-hidden','true');
-          // deixar a mensagem no card visível e esconder a foto
           photoWrap.classList.remove('grow');
+          // traz o "Não" de volta visível e reposicionado próximo ao Sim (mesma posição inicial)
+          botaoNao.style.visibility = 'visible';
+          posicionarInicialNao();
         }, 3200);
       }
 
@@ -424,25 +491,38 @@
             acaoOpcao(op.dataset.opcao);
           }
         });
-        // para acessibilidade: foco visual por teclado será natural
       });
 
-      // resize: manter o botão visível
-      window.addEventListener('resize', manterDentroDaTela);
+      // quando redimensiona, manter o "Não" dentro do controls
+      window.addEventListener('resize', manterNaoDentroControls);
 
-      // inicialização no load
+      // inicialização no load: posiciona NÃO ao lado do SIM
       window.addEventListener('load', () => {
-        setTimeout(inicializaPosicaoNao, 30);
+        setTimeout(() => {
+          posicionarInicialNao();
+        }, 30);
       });
 
-      // Segurança: caso o overlay seja clicado, fecha antes do timeout (UX)
+      // caso o usuário clique fora do overlay, fecha
       overlay.addEventListener('click', (e) => {
-        // se clicar fora da foto, fecha imediatamente
         if(e.target === overlay){
           overlay.classList.remove('show');
           overlay.setAttribute('aria-hidden','true');
           photoWrap.classList.remove('grow');
+          botaoNao.style.visibility = 'visible';
+          posicionarInicialNao();
         }
+      });
+
+      // acessibilidade: permitir mover o "Não" via teclado quando focado (setas)
+      botaoNao.addEventListener('keydown', (e) => {
+        const step = 18;
+        const left = parseFloat(botaoNao.style.left || 0);
+        const top = parseFloat(botaoNao.style.top || 0);
+        if(e.key === 'ArrowLeft'){ botaoNao.style.left = Math.max(8, left - step) + 'px'; }
+        if(e.key === 'ArrowRight'){ botaoNao.style.left = Math.min(controls.clientWidth - botaoNao.offsetWidth - 8, left + step) + 'px'; }
+        if(e.key === 'ArrowUp'){ botaoNao.style.top = Math.max(8, top - step) + 'px'; }
+        if(e.key === 'ArrowDown'){ botaoNao.style.top = Math.min(controls.clientHeight - botaoNao.offsetHeight - 8, top + step) + 'px'; }
       });
 
     })();
